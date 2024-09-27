@@ -1,1 +1,0 @@
-# Self-Guided Edition

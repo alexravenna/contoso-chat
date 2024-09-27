@@ -1,133 +1,79 @@
-# AI Tour Edition
+# Build a Retail Copilot Code-First on Azure AI
 
-The [Microsoft AI Tour](https://aka.ms/aitour) edition is meant to be used with the instructor-led **WRK550** workshops run using the Skillable lab platform. This version is designed for a **75 minute** in-venue session and provides you with an Azure subscription that is **pre-provisioned** with required resources. Just bring your own laptop (and charger) and dive in!
+!!! example "Microsoft AI Tour Attendees:  <br/> To get started with this workshop, [make sure you have everything you need](00-Before-You-Begin/index.md) to start building."   
 
----
+This website contains the step-by-step instructions for a hands-on workshop that teaches you how to **build, evaluate, and deploy a retail copilot code-first on Azure AI**. 
 
+- Our solution use the [Retrieval Augmented Generation (RAG) pattern](https://learn.microsoft.com/azure/ai-studio/concepts/retrieval-augmented-generation) to ground chat AI responses in the retailer's product catalog and cusomer data.
+- Our implementation uses [Prompty](https://prompty.ai) for ideation, [Azure AI Studio](https://ai.azure.com) as the platform for code-first copilotdevelopment, and [Azure Container Apps](https://aka.ms/azcontainerapps) for hosting the deployed copilot.
 
-## 1. Getting Started
-
-_Let's organize our development environment and get setup for the workshop._
-
-??? note "Step 1: Launch Skillable"
-
-    1. Open a new browser window
-    1. Navigate to Skillable Lab (`link`) = Tab 1️⃣
-    1. Click `Launch` - opens window with Login, Instructions = Tab 2️⃣
-    1. Click `Resources` tab - find admin `Password`
-    1. Click to fill password for login - confirm
-    1. You should see: Windows 11 Desktop ✅
-    1. Revisit `Resources` tab - look for `Azure Portal` section
-    1. Verify `Subscription`, `Username`, `Password` assigned ✅
-
-    **🌟 | CONGRATULATIONS!** - Your Skillable setup is ready.
-
-??? note "Step 2: Launch GitHub Codespaces"
-
-    1. Open a new browser tab = Tab 3️⃣
-    1. Navigate to the workshop sample ([Contoso Chat](https://aka.ms/aitour/contoso-chat)) 
-    1. Log into GitHub - use a personal login account
-    1. Fork this sample to your profile - uncheck `main` to get branches
-    1. Switch to `aitour-2025` branch in your fork
-    1. Click green `Code` button, select `Codespaces` tab
-    1. Click `Create new codespaces on aitour-fy25`
-    1. This should launch a new browser tab = Tab 4️⃣
-    1. Verify the new tab shows a VS Code editor ✅
-    1. Codespaces is loading ... this take a while
-
-    **🌟 | CONGRATULATIONS!** - Your Codespaces is running
-
-??? note "Step 3: View Azure Portal"
-
-    1. Open a new browser tab = Tab 5️⃣
-    1. Navigate to the [Azure Portal](https://portal.azure.com)
-    1. Sign in with Skillable `Username`-`Password` from Step 1.
-    1. Click `Resource Groups` - refresh periodically if needed
-    1. See: resource group `rg-AITOUR` created ✅
-    1. Click resource group item - view details page
-    1. Click `Deployments` - refresh, check if all `Succeeded` ✅
-    1. Click `Overview` - check if `15 resources` created ✅
-
-    **🌟 | CONGRATULATIONS!** - Your Azure Infra is Provisioned!
-
-??? note "Step 4: View Azure AI Studio"
-
-    1. Open a new browser tab = Tab 6️⃣
-    1. Navigate to the [Azure AI Studio](https://ai.azure.com)
-    1. Click `Sign in` - should auto-login with Azure credentials
-    1. Click `All resources` - see: a hub resource listed
-    1. Click hub resource - see: a project resource listed
-    1. Click project resource, `Settings` - see: 5 connections listed
-    1. Verify `aoai-connection` and `search-service-connection` setup ✅
-    1. Click `Deployments` tab - see 4 models in each category
-    1. Verify `gpt-4`, `gpt-35-turbo`, `text-embedding-ada-002` exist ✅
-
-    **🌟 | CONGRATULATIONS!** - Your Azure AI Project was created!
-
-??? note "Step 5: View Container Apps Endpoint"
-
-    1. Return to Azure Portal = Tab 5️⃣
-    1. Visit the `rg-AITOUR` Resource group page
-    1. Click the `Container Apps` resource - see details page
-    1. Look for `Application Url` - at top right
-    1. Click to launch in new tab = Tab 7️⃣
-    1. See: page with `Welcome to Container Apps`
-
-    **🌟 | CONGRATULATIONS!** - Your ACA Endpoint is provisioned!
-
-
-??? tip "This Completes Setup. Let's Review"
-
-    _You should have 7 open tabs as follows_.
-
-    1. Skillable Lab
-    2. Skillable VM
-    3. GitHub Repo
-    4. GitHub Codespaces
-    5. Azure Portal
-    6. Azure AI Studio
-    7. Azure Container Apps.
+In this section, we introduce the application scenario (Contoso Chat), review the design pattern used (RAG) and understand how it maps to our application architecture (on Azure AI). We'll wrap the section by understanding the application lifecycle (GenAIOps) and the three stages for end-to-end development that we will follow in this workshop.
 
 ---
 
-## 2. Setup Local Dev Env
+## 1. The App Scenario
 
-_Let's get back to the GitHub Codespaces tab and configure our Visual Studio Code environment to work with our provisioned Azure backend._
+**Contoso Outdoors** is an enterprise retailer that sells a wide variety of hiking and camping equipment to outdoor adventurer through their website. Customers visiting the site often call the customer support line with requests for product information or recommendations, before making their purchases. The retailer decides to build and integrate an AI-based _customer support agent_ (retail copilot) to handle these queries right from their website, for efficiency.
+
+![Contoso Chat UI](./img/chat-ui.png)
+
+**Contoso Chat** is the chat AI implementation (_backend_) for the retail copilot experience. It has a hosted API (_endpoint_) that the chat UI (_frontend_) can interact with to process user requests. Customers can now ask questions in a conversational format, using natural language, and get valid responses grounded in product data and their own purchase history.
+
+![Contoso Chat AI](./img/chat-ai.png)
+ 
+## 2. The RAG Pattern
+
+Foundation large language models are trained on massive quantities of public data, giving them the ability to answer general questions effectively. However, our retail copilot needs responses grounded in _private data_ that exists in the retailer's data stores. _Retrieval Augmented Generation_ (RAG) is a design pattern that provides a popular solution to this challenge with this workflow:
+
+1. The user query arrives at our copilot implementation via the endpoint (API).
+1. The copilot sends the text query to a **retrieval** service which vectorizes it for efficiency.
+1. It uses this vector to query a search index for matching results (e.g., based on similarity)
+1. The retrieval service returns results to the copilot, potentially with semantic ranking applied.
+1. The copilot **augments** the user prompt with this knowledge, and invokes the chat model.
+1. The chat model now **generates** responses _grounded_ in the provided knowledge.
+
+![RAG](./img/rag-design-pattern.png)
+ 
+## 3. The App Architecture
+
+Implementing this design pattern requires these architectural components:
+
+ - an **information retrieval** service (data indexing, similarity search, semantic ranking)
+ - a **database** service for storing other data (customer orders)
+ - a **model deployments** capability (for chat, embeddings - and AI-assisted evaluation)
+ - a **copilot hosting** capability (for real-world access to deployed endpoint)
+
+The corresponding Azure AI application architecture for the Contoso Chat retail copilot is shown below. The copilot is deployed to Azure Container Apps, providing a hosted API endpoint for client integration. The copilot processes incoming requests with the help of:
+
+ - **Azure OpenAI Services**  - provides model deployments for chat and text embeddings
+ - **Azure CosmosDB**  - stores the customer order data (JSON) in a noSQL database
+ - **Azure AI Search**  - indexes the product catalog with search-retrieval capability. 
+
+![ACA Architecture](./img/aca-architecture.png)
+
+The copilot _orchestrates_ the steps of the RAG workflow using **Prompty** assets (configured with required Azure OpenAI models) executed in a Prompty runtime (Python). It supports multi-turn conversations and responsible AI practices to meet response quality and safety requirements.
+
+## 4. The App Lifecycle
+
+Building generative AI applications requires an iterative process of refinement from _prompt_ to _production_. The application  lifecycle (GenAIOps) is best illustrated by the three stages shown:
+
+1. **Ideation** - involves building the initial prototype, validating it manually with a test prompt.
+2. **Evaluation** - involves assessing it for quality and safety with large, diverse test datasets.
+3. **Operationalization** - involves deploying it for real-world usage & monitoring it for insights.
+
+![GenAIOps](./img/gen-ai-ops.png)
+
+In our workshop, you willl see the development workflow organized into sections that mimic this lifecycle - giving you a more intuitive sense for how you can iteratively go from promt to production, code-first, with Azure AI.
+
+## 5. Related Resources
+
+1. **Prompty** | [Documentation](https://prompty.ai) · [Specification](https://github.com/microsoft/prompty/blob/main/Prompty.yaml)  · [Tooling](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.prompty) · [SDK](https://pypi.org/project/prompty/)
+1. **Azure AI Studio**  | [Documentation](https://learn.microsoft.com/en-us/azure/ai-studio/)  · [Architecture](https://learn.microsoft.com/azure/ai-studio/concepts/architecture) · [SDKs](https://learn.microsoft.com/azure/ai-studio/how-to/develop/sdk-overview) ·  [Evaluation](https://learn.microsoft.com/azure/ai-studio/how-to/evaluate-generative-ai-app)
+1. **Azure AI Search** | [Documentation](https://learn.microsoft.com/azure/search/)  · [Semantic Ranking](https://learn.microsoft.com/azure/search/semantic-search-overview) 
+1. **Azure Container Apps**  | [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/)  · [Deploy from code](https://learn.microsoft.com/en-us/azure/container-apps/quickstart-repo-to-cloud?tabs=bash%2Ccsharp&pivots=with-dockerfile)
+1. **Responsible AI**  | [Overview](https://www.microsoft.com/ai/responsible-ai)  · [With AI Services](https://learn.microsoft.com/en-us/azure/ai-services/responsible-use-of-ai-overview?context=%2Fazure%2Fai-studio%2Fcontext%2Fcontext)  · [Azure AI Content Safety](https://learn.microsoft.com/en-us/azure/ai-services/content-safety/)
 
 
-??? note "Step 1: Validate Codespaces Ready"
+---
 
-    1. Return to GitHub Codespaces (tab 4️⃣) 
-    1. See: VS Code editor with terminal open
-    1. Verify: `Prompty Extension` in sidebar (left, bottom)
-    1. Verify: Cursor ready in VS Code terminal (bottom)
-    1. Verify Python installed: `python --version` ✅
-    1. Verify Azure CLI installed: `az version` ✅
-    1. Verify Azure Developer CLI installed: `azd version` ✅
-    1. Verify Prompty installed: `prompty --version` ✅
-    1. Verify FastAPI installed: `fastapi --version` ✅
-
-??? note "Step 2: Authenticate with Azure via CLIs"
-
-    1. Log into Azure CLI - `az login --use-device-code`
-    1. Complete authflow - use default tenant, subscription
-    1. You are now logged into Azure CLI ✅
-    1. Log into Azure Developer CLI - `azd auth login`
-    1. Complete authflow - see: "Logged in to Azure" ✅
-
-??? note "Step 3: Refresh Azure Dev Env in local env"
-
-    1. Run `azd env refresh -e AITOUR` in terminal
-    1. Select default subscription
-    1. Select `francecentral` as Azure location
-    1. See: `SUCCESS: Environment refresh completed`
-    1. See: `.azure/AITOUR/.env` created with values  ✅
-
-??? note "Step 4: Run post-provisioning hooks"
-
-    1. Run `azd hooks run postprovision` in terminal
-    1. Run `bash infra/hooks/update-roles.sh` in terminal
-    1. Run `bash infra/hooks/populate-data.sh` in terminal
-    1. This will take a few minutes ....
-    1. Builds and deploys container app ..
-    1. Sets .env variables 
+!!! example "To get started with this workshop, [make sure you have everything you need](00-Before-You-Begin/index.md) to start building."
